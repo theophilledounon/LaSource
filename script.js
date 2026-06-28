@@ -334,6 +334,7 @@ function commencerOnboarding() {
   etat.etapeOnboarding = 1;
   majEtapeOnboarding();
   afficherVue('vue-onboarding');
+  remplirSelectPays();
 }
 async function naviguerEtape(delta) {
   // Validation des champs OBLIGATOIRES avant d'avancer
@@ -383,14 +384,17 @@ async function finaliserInscription() {
   // ----- Mode navigateur -----
   if (!MODE.api) {
     try {
+      const photoOnboarding = etat.utilisateur && etat.utilisateur.photo;
       const compte = Comptes.creer({
         prenom, nom, email, mot_de_passe: mdp,
         role: etat.roleChoisi || 'etudiant',
         pays, etudes, bio, secteurs,
+        photo_url: photoOnboarding || null,
       });
       Comptes.ouvrirSession(compte.id);
       SESSION.utilisateur = compteVersProfil(compte);
       appliquerUtilisateur(SESSION.utilisateur);
+      if (photoOnboarding) etat.utilisateur.photo = photoOnboarding;
       toast('Inscription terminée. Bienvenue sur LaSource !');
       return true;
     } catch (err) {
@@ -401,6 +405,7 @@ async function finaliserInscription() {
 
   // ----- Mode serveur -----
   try {
+    const photoOnboarding = etat.utilisateur && etat.utilisateur.photo;
     await API.post('/auth/inscription', {
       prenom, nom, email, mot_de_passe: mdp,
       role: etat.roleChoisi || 'etudiant',
@@ -411,6 +416,7 @@ async function finaliserInscription() {
       MODE.utilisateur = await API.get('/profil/moi');
     }
     appliquerUtilisateur(MODE.utilisateur);
+    if (photoOnboarding) etat.utilisateur.photo = photoOnboarding;
     toast('Inscription terminée. Bienvenue sur LaSource !');
     return true;
   } catch (err) {
@@ -445,6 +451,63 @@ function majEtapeOnboarding() {
   }
 }
 function toggleChip(elem) { elem.classList.toggle('actif'); }
+
+/* Chip "Autre" : permet à l'utilisateur de saisir un secteur personnalisé. */
+function toggleChipAutre(elem) {
+  elem.classList.toggle('actif');
+  const champ = document.getElementById('champ-autre-secteur');
+  const input = document.getElementById('input-autre-secteur');
+  if (!champ || !input) return;
+  if (elem.classList.contains('actif')) {
+    champ.style.display = '';
+    setTimeout(() => input.focus(), 50);
+  } else {
+    champ.style.display = 'none';
+    input.value = '';
+    elem.textContent = 'Autre';
+  }
+}
+function majChipAutre(val) {
+  const chip = document.querySelector('#etape-2 .chip-select[data-autre="1"]');
+  if (!chip) return;
+  const v = (val || '').trim();
+  chip.textContent = v || 'Autre';
+}
+
+/* Liste exhaustive des pays (FR) pour le sélecteur de l'onboarding. */
+const LISTE_PAYS = [
+  "Afghanistan","Afrique du Sud","Albanie","Algérie","Allemagne","Andorre","Angola","Antigua-et-Barbuda","Arabie saoudite","Argentine","Arménie","Australie","Autriche","Azerbaïdjan",
+  "Bahamas","Bahreïn","Bangladesh","Barbade","Belgique","Belize","Bénin","Bhoutan","Biélorussie","Birmanie (Myanmar)","Bolivie","Bosnie-Herzégovine","Botswana","Brésil","Brunei","Bulgarie","Burkina Faso","Burundi",
+  "Cambodge","Cameroun","Canada","Cap-Vert","Chili","Chine","Chypre","Colombie","Comores","Corée du Nord","Corée du Sud","Costa Rica","Côte d'Ivoire","Croatie","Cuba",
+  "Danemark","Djibouti","Dominique",
+  "Égypte","Émirats arabes unis","Équateur","Érythrée","Espagne","Estonie","Eswatini","États-Unis","Éthiopie",
+  "Fidji","Finlande","France",
+  "Gabon","Gambie","Géorgie","Ghana","Grèce","Grenade","Guatemala","Guinée","Guinée équatoriale","Guinée-Bissau","Guyana",
+  "Haïti","Honduras","Hongrie",
+  "Îles Marshall","Îles Salomon","Inde","Indonésie","Irak","Iran","Irlande","Islande","Israël","Italie",
+  "Jamaïque","Japon","Jordanie",
+  "Kazakhstan","Kenya","Kirghizistan","Kiribati","Koweït",
+  "Laos","Lesotho","Lettonie","Liban","Libéria","Libye","Liechtenstein","Lituanie","Luxembourg",
+  "Macédoine du Nord","Madagascar","Malaisie","Malawi","Maldives","Mali","Malte","Maroc","Maurice","Mauritanie","Mexique","Micronésie","Moldavie","Monaco","Mongolie","Monténégro","Mozambique",
+  "Namibie","Nauru","Népal","Nicaragua","Niger","Nigéria","Norvège","Nouvelle-Zélande",
+  "Oman","Ouganda","Ouzbékistan",
+  "Pakistan","Palaos","Palestine","Panama","Papouasie-Nouvelle-Guinée","Paraguay","Pays-Bas","Pérou","Philippines","Pologne","Portugal",
+  "Qatar",
+  "République centrafricaine","République démocratique du Congo","République dominicaine","République du Congo","République tchèque","Roumanie","Royaume-Uni","Russie","Rwanda",
+  "Saint-Christophe-et-Niévès","Saint-Marin","Saint-Vincent-et-les-Grenadines","Sainte-Lucie","Salvador","Samoa","Sao Tomé-et-Principe","Sénégal","Serbie","Seychelles","Sierra Leone","Singapour","Slovaquie","Slovénie","Somalie","Soudan","Soudan du Sud","Sri Lanka","Suède","Suisse","Suriname","Syrie",
+  "Tadjikistan","Tanzanie","Tchad","Thaïlande","Timor oriental","Togo","Tonga","Trinité-et-Tobago","Tunisie","Turkménistan","Turquie","Tuvalu",
+  "Ukraine","Uruguay",
+  "Vanuatu","Vatican","Venezuela","Viêt Nam",
+  "Yémen",
+  "Zambie","Zimbabwe"
+];
+function remplirSelectPays() {
+  const sel = document.getElementById('select-pays');
+  if (!sel || sel.dataset.remp === '1') return;
+  sel.dataset.remp = '1';
+  sel.innerHTML = '<option value="">— Sélectionnez votre pays —</option>' +
+    LISTE_PAYS.map(p => `<option value="${p}">${p}</option>`).join('');
+}
 async function seDeconnecter() {
   document.getElementById('menuProfil').classList.remove('ouvert');
   if (MODE.api) {
@@ -490,9 +553,14 @@ function televerserPhotoCompte() {
   });
 }
 
-/* Icône "pouce" type Facebook (utilisée pour le bouton Utile) */
-function iconePouce() {
-  return `<svg class="icone-pouce" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 10h3.6c.22 0 .4.18.4.4V21.6c0 .22-.18.4-.4.4H2c-.55 0-1-.45-1-1v-10c0-.55.45-1 1-1zm6 0h1.05L13.2 3.6c.42-.7 1.34-.95 2.05-.55.55.31.83.94.7 1.56L14.9 9h5.6c1.1 0 2 .9 2 2v1.18c0 .26-.05.52-.15.76l-3 7.06c-.32.74-1.05 1.22-1.85 1.22H8c-.55 0-1-.45-1-1V11c0-.55.45-1 1-1z"/></svg>`;
+/* Icône "pouce" type Facebook (utilisée pour le bouton Utile / Favoris).
+   Affichage en contour par défaut, remplie quand `actif` est vrai. */
+function iconePouce(actif = false) {
+  const d = "M2 10h3.6c.22 0 .4.18.4.4V21.6c0 .22-.18.4-.4.4H2c-.55 0-1-.45-1-1v-10c0-.55.45-1 1-1zm6 0h1.05L13.2 3.6c.42-.7 1.34-.95 2.05-.55.55.31.83.94.7 1.56L14.9 9h5.6c1.1 0 2 .9 2 2v1.18c0 .26-.05.52-.15.76l-3 7.06c-.32.74-1.05 1.22-1.85 1.22H8c-.55 0-1-.45-1-1V11c0-.55.45-1 1-1z";
+  if (actif) {
+    return `<svg class="icone-pouce" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}" fill="currentColor"/></svg>`;
+  }
+  return `<svg class="icone-pouce" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="${d}"/></svg>`;
 }
 
 /* ============================================================
@@ -639,7 +707,7 @@ function carteQuestionHTML(q) {
       <p class="q-corps">${echapper(q.corps)}</p>
       <div class="q-tags"><span class="tag">${echapper(q.secteur)}</span></div>
       <div class="q-pied">
-        <button class="btn-utile${utileActif}" onclick="basculerUtileQ(${q.id})" aria-label="Ajouter aux favoris">${iconePouce()}<span class="cnt">${q.utile}</span><span class="lbl">${etat.utilesQ.has(q.id) ? 'En favori' : 'Favori'}</span></button>
+        <button class="btn-utile${utileActif}" onclick="basculerUtileQ(${q.id})" aria-label="En favoris" title="En favoris">${iconePouce(etat.utilesQ.has(q.id))}<span class="cnt">${q.utile}</span><span class="lbl">En favoris</span></button>
         <button onclick="ouvrirQuestion(${q.id})">${ic('bulle','ic ic-s')} ${q.repCount} réponses</button>
         <button class="bouton-sauver${saveActif}" onclick="basculerSauver(${q.id})" title="Sauvegarder">${ic('marque','ic ic-s')} ${etat.sauvegardees.has(q.id) ? 'Sauvegardée' : 'Sauvegarder'}</button>
         <button class="repondre btn btn-secondaire btn-petit" onclick="ouvrirQuestion(${q.id})">Voir / Répondre</button>
@@ -665,7 +733,7 @@ async function basculerUtileQ(id) {
         if (r.marque) etat.utilesQ.add(id); else etat.utilesQ.delete(id);
         rendreCourant();
       }
-      toast(r?.marque ? 'Ajouté aux favoris.' : 'Retiré des favoris.');
+      toast(r?.marque ? 'En favoris.' : 'Retiré des favoris.');
     } catch (err) {
       // Rollback en cas d'échec serveur
       if (etaitMarque) { etat.utilesQ.add(id); q.utile++; }
@@ -674,7 +742,7 @@ async function basculerUtileQ(id) {
       toast(err.message || 'Action impossible.', 'erreur');
     }
   } else {
-    toast(etat.utilesQ.has(id) ? 'Ajouté aux favoris.' : 'Retiré des favoris.');
+    toast(etat.utilesQ.has(id) ? 'En favoris.' : 'Retiré des favoris.');
   }
 }
 
@@ -738,7 +806,7 @@ function ouvrirQuestion(id) {
       <p class="q-corps">${echapper(q.corps)}</p>
       <div class="q-tags"><span class="tag">${echapper(q.secteur)}</span></div>
       <div class="q-pied">
-        <button class="btn-utile${utileActif}" onclick="basculerUtileQ(${q.id})">${iconePouce()}<span class="cnt">${q.utile}</span><span class="lbl">${etat.utilesQ.has(q.id) ? 'En favori' : 'Favori'}</span></button>
+        <button class="btn-utile${utileActif}" onclick="basculerUtileQ(${q.id})" aria-label="En favoris" title="En favoris">${iconePouce(etat.utilesQ.has(q.id))}<span class="cnt">${q.utile}</span><span class="lbl">En favoris</span></button>
         <button class="bouton-sauver${saveActif}" onclick="basculerSauver(${q.id})">${ic('marque','ic ic-s')} ${etat.sauvegardees.has(q.id) ? 'Sauvegardée' : 'Sauvegarder'}</button>
       </div>
       <div class="reponses" style="display:flex; flex-direction:column;">
@@ -768,7 +836,7 @@ function reponseHTML(r) {
       <div class="r-entete">${avatarHTML(r.init, 's')}<div class="info"><strong>${echapper(r.auteur)}</strong> ${badge}</div></div>
       <p>${echapper(r.contenu)}</p>
       <div class="actions">
-        <button class="btn-utile" onclick="utileR(this)">${iconePouce()}<span class="cnt">${r.utile}</span><span class="lbl">Favori</span></button>
+        <button class="btn-utile" onclick="utileR(this)" aria-label="En favoris" title="En favoris">${iconePouce(false)}<span class="cnt">${r.utile}</span><span class="lbl">En favoris</span></button>
         ${etoiles}
       </div>
       ${sous}
@@ -777,6 +845,13 @@ function reponseHTML(r) {
 
 async function utileR(btn, idReponse) {
   const actif = btn.classList.toggle('actif');
+  // Bascule le rendu de l'icône (contour ↔ rempli) selon l'état
+  const ic = btn.querySelector('.icone-pouce');
+  if (ic) {
+    const nouv = document.createElement('span');
+    nouv.innerHTML = iconePouce(actif);
+    btn.replaceChild(nouv.firstChild, ic);
+  }
   const cnt = btn.querySelector('.cnt');
   const n = parseInt(cnt.textContent, 10) || 0;
   cnt.textContent = actif ? n + 1 : Math.max(0, n - 1);
@@ -784,14 +859,14 @@ async function utileR(btn, idReponse) {
   if (MODE.api && idReponse) {
     try {
       await API.post(`/reponses/${idReponse}/utile`, {});
-      toast(actif ? 'Réponse ajoutée aux favoris.' : 'Retiré des favoris.');
+      toast(actif ? 'En favoris.' : 'Retiré des favoris.');
     } catch (err) {
       btn.classList.toggle('actif');
       cnt.textContent = n;
       toast(err.message || 'Action impossible.', 'erreur');
     }
   } else {
-    toast(actif ? 'Réponse ajoutée aux favoris.' : 'Retiré des favoris.');
+    toast(actif ? 'En favoris.' : 'Retiré des favoris.');
   }
 }
 function noter(elem, n) {
@@ -1019,8 +1094,10 @@ function rendreProfil() {
   const estMentorVerifie = estMentor() && u.verifie;
   const entete = document.getElementById('entete-profil');
   entete.innerHTML = `
-    ${avatarHTML(u.initiales, 'xl', u.photo, estMentorVerifie)}
-    <div class="infos">
+    <div class="col-avatar">
+      ${avatarHTML(u.initiales, 'xl', u.photo, estMentorVerifie)}
+    </div>
+    <div class="col-infos">
       <h2>${echapper(u.prenom + ' ' + u.nom)}
         ${estMentorVerifie ? badgeMentorVerifie() : ''}
       </h2>
@@ -1029,19 +1106,30 @@ function rendreProfil() {
         ${u.pays ? `<span>${ic('position','ic ic-s')} ${echapper(u.pays)}</span>` : ''}
         ${u.etudes ? `<span>${ic('ecole','ic ic-s')} ${echapper(u.etudes)}</span>` : ''}
       </div>
-      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+      <div class="tags-profil">
         ${u.secteurs.map(s => `<span class="tag">${echapper(s)}</span>`).join('')}
       </div>
-      <div style="display:flex; gap:24px; margin-top:14px; font-size:14px;">
-        <div><strong style="font-family:'DM Serif Display',serif; font-size:1.4rem; color:var(--primaire);">${u.questionsPosees}</strong> questions</div>
-        <div><strong style="font-family:'DM Serif Display',serif; font-size:1.4rem; color:var(--primaire);">${u.mentorsSuivis}</strong> mentors suivis</div>
-        ${estMentor() ? `<div><strong style="font-family:'DM Serif Display',serif; font-size:1.4rem; color:var(--vert);">12</strong> réponses publiées</div>` : ''}
-      </div>
+      ${u.bio ? `<p class="bio-profil">${echapper(u.bio)}</p>` : ''}
     </div>
-    <div class="actions">
+    <div class="col-actions">
       <button class="btn btn-secondaire" onclick="televerserPhotoCompte()">${ic('appareil')} Photo</button>
       <button class="btn btn-secondaire" onclick="naviguerApp('parametres')">${ic('crayon')} Modifier</button>
     </div>`;
+  const stats = document.getElementById('stats-profil');
+  stats.style.display = '';
+  stats.innerHTML = `
+    <div class="stat-item">
+      <span class="stat-valeur">${u.questionsPosees}</span>
+      <span class="stat-label">Questions</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-valeur">${u.mentorsSuivis}</span>
+      <span class="stat-label">Mentors suivis</span>
+    </div>
+    ${estMentor() ? `<div class="stat-item accent">
+      <span class="stat-valeur">12</span>
+      <span class="stat-label">Réponses publiées</span>
+    </div>` : ''}`;
   document.getElementById('tabs-profil').innerHTML = `
     <div class="tab-profil actif" onclick="ongletProfil(this, 'questions')">Mes questions</div>
     <div class="tab-profil" onclick="ongletProfil(this, 'sauvees')">Questions sauvegardées</div>
@@ -1074,24 +1162,36 @@ function rendreProfilMentor(m) {
   const dispoLabel = { disponible:'Disponible', occupe:'Occupé', absent:'Absent' }[m.dispo];
   const suivi = etat.suivis.has(m.id);
   document.getElementById('entete-profil').innerHTML = `
-    ${avatarHTML(m.initiales, 'xl', null, m.verifie)}
-    <div class="infos">
+    <div class="col-avatar">
+      ${avatarHTML(m.initiales, 'xl', null, m.verifie)}
+    </div>
+    <div class="col-infos">
       <h2>${echapper(m.prenom + ' ' + m.nom)} ${m.verifie ? badgeMentorVerifie() : ''}</h2>
       <div class="ligne-meta">
         <span class="badge-role badge-mentor">${ic('trophee','ic ic-s')} Mentor</span>
         <span>${ic('position','ic ic-s')} ${echapper(m.ville + ', ' + m.pays)}</span>
         <span><span class="point-statut ${m.dispo}"></span>${dispoLabel}</span>
       </div>
-      <p style="margin:10px 0; color:var(--texte-doux);">${echapper(m.bio)}</p>
-      <div style="display:flex; gap:6px; flex-wrap:wrap;"><span class="tag tag-ambre">${echapper(m.secteur)}</span></div>
-      <div style="display:flex; gap:24px; margin-top:14px; font-size:14px;">
-        <div><strong style="font-family:'DM Serif Display',serif; font-size:1.4rem; color:var(--primaire);">${m.reponses}</strong> réponses</div>
-        <div><strong style="font-family:'DM Serif Display',serif; font-size:1.4rem; color:var(--vert);">${m.note} ★</strong> note moyenne</div>
-        <div><strong style="font-family:'DM Serif Display',serif; font-size:1.4rem; color:var(--primaire);">${echapper(m.anciennete)}</strong> sur LaSource</div>
-      </div>
+      <div class="tags-profil"><span class="tag tag-ambre">${echapper(m.secteur)}</span></div>
+      ${m.bio ? `<p class="bio-profil">${echapper(m.bio)}</p>` : ''}
     </div>
-    <div class="actions">
+    <div class="col-actions">
       <button class="btn ${suivi ? 'btn-secondaire' : 'btn-primaire'}" onclick="basculerSuivre(${m.id}); profilCible = mentors.find(x => x.id === ${m.id}); rendreProfilMentor(profilCible);">${suivi ? ic('check','ic ic-s') + ' Suivi' : '+ Suivre'}</button>
+    </div>`;
+  const stats = document.getElementById('stats-profil');
+  stats.style.display = '';
+  stats.innerHTML = `
+    <div class="stat-item">
+      <span class="stat-valeur">${m.reponses}</span>
+      <span class="stat-label">Réponses</span>
+    </div>
+    <div class="stat-item accent">
+      <span class="stat-valeur">${m.note} ★</span>
+      <span class="stat-label">Note moyenne</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-valeur">${echapper(m.anciennete)}</span>
+      <span class="stat-label">Sur LaSource</span>
     </div>`;
   document.getElementById('tabs-profil').innerHTML = `
     <div class="tab-profil actif" onclick="ongletMentor(this, 'apropos')">À propos</div>
@@ -1716,11 +1816,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   } catch (_) { /* tolérance */ }
 
-  // Si déjà connecté, basculer directement dans l'app
-  if (MODE.utilisateur) {
+  // Toujours afficher la page de bienvenue au chargement, sauf si l'URL
+  // contient `#app` (alors on bascule directement dans l'application si
+  // une session est encore active).
+  const veutApp = window.location.hash === '#app';
+  if (MODE.utilisateur && veutApp) {
     appliquerUtilisateur(MODE.utilisateur);
     afficherVue('vue-app');
     initApp();
+  } else {
+    afficherVue('vue-accueil');
   }
 });
 
